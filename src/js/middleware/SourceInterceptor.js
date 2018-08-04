@@ -8,6 +8,31 @@ module.exports = function(videojs) {
    videojs.use('*', function(player) {
 
       return {
+        callPlay: function callPlay() {
+          // Block play calls while waiting for an ad, only if this is an
+          // ad supported player
+          if (player.playlist && player.playlist.totalPlayedCount_ && player.playlist.totalPlayedCount_ != 0) {
+            if (player.ads && player.ads._shouldBlockPlay === true) {
+              player.ads.debug('Using playMiddleware to block content playback');
+              player.ads._playBlocked = true;
+              return videojs.middleware.TERMINATOR;
+            }
+          }
+        },
+
+        play: function play(terminated, value) {
+          if (player.ads && player.ads._playBlocked && terminated) {
+            player.ads.debug('Play call to Tech was terminated.');
+            // Trigger play event to match the user's intent to play.
+            // The call to play on the Tech has been blocked, so triggering
+            // the event on the Player will not affect the Tech's playback state.
+            player.trigger('play');
+            // At this point the player has technically started
+            player.addClass('vjs-has-started');
+            // Reset playBlocked
+            player.ads._playBlocked = false;
+          }
+        },
 
          setSource: function(playerSelectedSource, next) {
             var sources = player.currentSources(),
